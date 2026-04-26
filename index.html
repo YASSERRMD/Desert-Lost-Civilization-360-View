@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desert Lost Civilization 360 View</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(17, 12, 7, 0.68);
+      --panel-strong: rgba(17, 12, 7, 0.82);
+      --line: rgba(255, 224, 170, 0.24);
+      --text: #fff3d8;
+      --muted: #d4b77f;
+      --accent: #f2ad52;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0f0905;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      user-select: none;
+    }
+
+    .stage {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background: #110b06;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .fade {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      background: #0f0905;
+      opacity: 1;
+      transition: opacity 420ms ease;
+    }
+
+    .topHud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 5;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .location,
+    .help,
+    .bottomBar {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+    }
+
+    .location {
+      min-width: 0;
+      max-width: min(420px, calc(100vw - 152px));
+      padding: 10px 12px;
+    }
+
+    .location h1 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .location p,
+    .help {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+    }
+
+    .location p {
+      margin: 4px 0 0;
+    }
+
+    .help {
+      padding: 9px 11px;
+      white-space: nowrap;
+    }
+
+    .waypointLayer {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .waypoint {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 226, 174, 0.58);
+      border-radius: 50%;
+      color: #fff8e9;
+      background: rgba(40, 25, 13, 0.54);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.3);
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: opacity 160ms ease, transform 160ms ease, background 160ms ease;
+    }
+
+    .waypoint:hover {
+      background: rgba(93, 58, 26, 0.66);
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+
+    .waypoint[hidden] {
+      display: none;
+    }
+
+    .waypoint svg,
+    .button svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.35;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .bottomBar {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 6;
+      width: min(760px, calc(100vw - 24px));
+      min-height: 68px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: var(--panel-strong);
+      transform: translateX(-50%);
+    }
+
+    .cluster,
+    .route {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .cluster {
+      justify-content: center;
+    }
+
+    .route {
+      min-width: 0;
+      justify-content: center;
+      padding: 0 4px;
+    }
+
+    .button {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 226, 174, 0.36);
+      border-radius: 8px;
+      color: #fff6e5;
+      background: rgba(67, 42, 20, 0.52);
+      cursor: pointer;
+      transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
+    }
+
+    .button:hover {
+      background: rgba(109, 67, 29, 0.68);
+      transform: translateY(-1px);
+    }
+
+    .button:disabled {
+      opacity: 0.35;
+      cursor: default;
+      transform: none;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 229, 180, 0.34);
+      cursor: pointer;
+    }
+
+    .dot[aria-current="true"] {
+      background: var(--accent);
+      box-shadow: 0 0 0 5px rgba(242, 173, 82, 0.18);
+    }
+
+    .routeLabel {
+      min-width: 58px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .error {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      z-index: 8;
+      width: min(520px, calc(100vw - 32px));
+      padding: 14px;
+      border: 1px solid rgba(255, 154, 100, 0.38);
+      border-radius: 8px;
+      color: #ffd8c0;
+      background: rgba(39, 18, 10, 0.88);
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .error[hidden] {
+      display: none;
+    }
+
+    @media (max-width: 720px) {
+      .help {
+        display: none;
+      }
+
+      .location {
+        max-width: calc(100vw - 32px);
+      }
+
+      .bottomBar {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .route {
+        order: -1;
+      }
+
+      .button {
+        width: 40px;
+        height: 40px;
+      }
+
+      .waypoint {
+        width: 56px;
+        height: 56px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <canvas id="scene" aria-label="360 degree panorama viewer"></canvas>
+  </main>
+
+  <header class="topHud">
+    <section class="location" aria-live="polite">
+      <h1 id="nodeTitle">Desert Lost Civilization</h1>
+      <p id="nodeMeta">Drag to look around</p>
+    </section>
+    <div class="help">Drag: look around · Wheel: zoom · Arrows: move</div>
+  </header>
+
+  <div class="waypointLayer" aria-label="Scene navigation waypoints">
+    <button class="waypoint" id="backWaypoint" type="button" aria-label="Move back">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+    </button>
+    <button class="waypoint" id="forwardWaypoint" type="button" aria-label="Move forward">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+    </button>
+  </div>
+
+  <nav class="bottomBar" aria-label="Street view controls">
+    <div class="cluster">
+      <button class="button" id="prevButton" type="button" aria-label="Previous node">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      </button>
+      <button class="button" id="nextButton" type="button" aria-label="Next node">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+      </button>
+    </div>
+    <div class="route" id="routeDots"></div>
+    <div class="cluster">
+      <button class="button" id="zoomOut" type="button" aria-label="Zoom out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+      </button>
+      <button class="button" id="zoomIn" type="button" aria-label="Zoom in">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+      </button>
+      <button class="button" id="resetView" type="button" aria-label="Reset view">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="fade" id="fade"></div>
+  <div class="error" id="error" hidden></div>
+
+  <script>
+    const WORLD_NODES = [
+      { id: "node_1", title: "Distant Dunes", connections: ["node_2"] },
+      { id: "node_2", title: "Ruined Archway", connections: ["node_1", "node_3"] },
+      { id: "node_3", title: "Narrow Sand Path", connections: ["node_2", "node_4"] },
+      { id: "node_4", title: "Broken Pillars Corridor", connections: ["node_3", "node_5"] },
+      { id: "node_5", title: "Open Courtyard", connections: ["node_4", "node_6"] },
+      { id: "node_6", title: "Dry Fountain Center", connections: ["node_5", "node_7"] },
+      { id: "node_7", title: "Hidden Oasis Reveal", connections: ["node_6", "node_8"] },
+      { id: "node_8", title: "Inner Temple Entrance", connections: ["node_7", "node_9"] },
+      { id: "node_9", title: "Rooftop Elevated View", connections: ["node_8", "node_10"] },
+      { id: "node_10", title: "Final Sunset Overlook", connections: ["node_9"] }
+    ];
+
+    const canvas = document.getElementById("scene");
+    const gl = canvas.getContext("webgl", { antialias: true, alpha: false, preserveDrawingBuffer: true });
+    const fade = document.getElementById("fade");
+    const errorBox = document.getElementById("error");
+    const nodeTitle = document.getElementById("nodeTitle");
+    const nodeMeta = document.getElementById("nodeMeta");
+    const routeDots = document.getElementById("routeDots");
+    const prevButton = document.getElementById("prevButton");
+    const nextButton = document.getElementById("nextButton");
+    const zoomOut = document.getElementById("zoomOut");
+    const zoomIn = document.getElementById("zoomIn");
+    const resetView = document.getElementById("resetView");
+    const backWaypoint = document.getElementById("backWaypoint");
+    const forwardWaypoint = document.getElementById("forwardWaypoint");
+
+    const vertexSource = `
+      attribute vec2 a_position;
+      varying vec2 v_position;
+
+      void main() {
+        v_position = a_position;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+
+    const fragmentSource = `
+      precision highp float;
+
+      uniform sampler2D u_texture;
+      uniform vec2 u_resolution;
+      uniform float u_yaw;
+      uniform float u_pitch;
+      uniform float u_fov;
+      varying vec2 v_position;
+
+      const float PI = 3.14159265358979323846264;
+
+      mat3 rotateY(float angle) {
+        float s = sin(angle);
+        float c = cos(angle);
+        return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c);
+      }
+
+      mat3 rotateX(float angle) {
+        float s = sin(angle);
+        float c = cos(angle);
+        return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c);
+      }
+
+      void main() {
+        float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+        float zoom = tan(u_fov * 0.5);
+        vec3 dir = normalize(vec3(v_position.x * aspect * zoom, v_position.y * zoom, -1.0));
+        dir = rotateY(u_yaw) * rotateX(u_pitch) * dir;
+
+        float lon = atan(dir.x, -dir.z);
+        float lat = asin(clamp(dir.y, -1.0, 1.0));
+        vec2 uv = vec2(0.5 + lon / (2.0 * PI), 0.5 - lat / PI);
+
+        gl_FragColor = texture2D(u_texture, uv);
+      }
+    `;
+
+    if (!gl) {
+      showError("WebGL is unavailable in this browser, so the 360 camera cannot run.");
+      throw new Error("WebGL unavailable");
+    }
+
+    let program;
+    let texture;
+    let currentNodeIndex = 0;
+    let yaw = 0;
+    let pitch = 0;
+    let fov = Math.PI / 2.35;
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let animationFrame = 0;
+
+    function showError(message) {
+      errorBox.hidden = false;
+      errorBox.textContent = message;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function normalizeAngle(angle) {
+      while (angle > Math.PI) angle -= Math.PI * 2;
+      while (angle < -Math.PI) angle += Math.PI * 2;
+      return angle;
+    }
+
+    function compileShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(shader));
+      }
+      return shader;
+    }
+
+    function createProgram() {
+      const nextProgram = gl.createProgram();
+      gl.attachShader(nextProgram, compileShader(gl.VERTEX_SHADER, vertexSource));
+      gl.attachShader(nextProgram, compileShader(gl.FRAGMENT_SHADER, fragmentSource));
+      gl.linkProgram(nextProgram);
+      if (!gl.getProgramParameter(nextProgram, gl.LINK_STATUS)) {
+        throw new Error(gl.getProgramInfoLog(nextProgram));
+      }
+      return nextProgram;
+    }
+
+    function setupRenderer() {
+      program = createProgram();
+      gl.useProgram(program);
+
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, -1, 1,
+        -1, 1, 1, -1, 1, 1
+      ]), gl.STATIC_DRAW);
+
+      const position = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+      program.uniforms = {
+        resolution: gl.getUniformLocation(program, "u_resolution"),
+        yaw: gl.getUniformLocation(program, "u_yaw"),
+        pitch: gl.getUniformLocation(program, "u_pitch"),
+        fov: gl.getUniformLocation(program, "u_fov"),
+        texture: gl.getUniformLocation(program, "u_texture")
+      };
+
+      gl.uniform1i(program.uniforms.texture, 0);
+    }
+
+    function imagePath(node) {
+      return `images/${node.id}.jpg`;
+    }
+
+    function loadTexture(src) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+          const nextTexture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, nextTexture);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+          gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          resolve(nextTexture);
+        };
+        image.onerror = () => reject(new Error(`Could not load ${src}`));
+        image.src = src;
+      });
+    }
+
+    function getForwardIndex() {
+      const node = WORLD_NODES[currentNodeIndex];
+      return node.connections
+        .map(id => WORLD_NODES.findIndex(item => item.id === id))
+        .filter(index => index > currentNodeIndex)
+        .sort((a, b) => a - b)[0] ?? -1;
+    }
+
+    function getBackIndex() {
+      const node = WORLD_NODES[currentNodeIndex];
+      return node.connections
+        .map(id => WORLD_NODES.findIndex(item => item.id === id))
+        .filter(index => index < currentNodeIndex)
+        .sort((a, b) => b - a)[0] ?? -1;
+    }
+
+    function updateUi() {
+      const node = WORLD_NODES[currentNodeIndex];
+      const backIndex = getBackIndex();
+      const forwardIndex = getForwardIndex();
+      nodeTitle.textContent = node.title;
+      nodeMeta.textContent = `${currentNodeIndex + 1} / ${WORLD_NODES.length} · FOV ${Math.round(fov * 180 / Math.PI)}°`;
+      prevButton.disabled = backIndex < 0;
+      nextButton.disabled = forwardIndex < 0;
+      backWaypoint.hidden = backIndex < 0;
+      forwardWaypoint.hidden = forwardIndex < 0;
+
+      routeDots.innerHTML = "";
+      WORLD_NODES.forEach((item, index) => {
+        const dot = document.createElement("button");
+        dot.className = "dot";
+        dot.type = "button";
+        dot.setAttribute("aria-label", `${index + 1}. ${item.title}`);
+        dot.setAttribute("aria-current", index === currentNodeIndex ? "true" : "false");
+        dot.addEventListener("click", () => goToNode(index));
+        routeDots.appendChild(dot);
+      });
+
+      const label = document.createElement("span");
+      label.className = "routeLabel";
+      label.textContent = `${currentNodeIndex + 1} / ${WORLD_NODES.length}`;
+      routeDots.appendChild(label);
+    }
+
+    async function goToNode(index) {
+      if (index < 0 || index >= WORLD_NODES.length || index === currentNodeIndex && texture) return;
+      fade.style.opacity = "1";
+
+      try {
+        const nextTexture = await loadTexture(imagePath(WORLD_NODES[index]));
+        if (texture) gl.deleteTexture(texture);
+        texture = nextTexture;
+        currentNodeIndex = index;
+        yaw = 0;
+        pitch = 0;
+        fov = Math.PI / 2.35;
+        errorBox.hidden = true;
+        updateUi();
+      } catch (error) {
+        showError(`${error.message}. Expected local generated image at /images/${WORLD_NODES[index].id}.jpg.`);
+      }
+
+      window.setTimeout(() => {
+        fade.style.opacity = "0";
+      }, 90);
+    }
+
+    function resize() {
+      const ratio = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.floor(canvas.clientWidth * ratio));
+      const height = Math.max(1, Math.floor(canvas.clientHeight * ratio));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+
+    function projectBearing(bearing, verticalOffset) {
+      const delta = normalizeAngle(bearing - yaw);
+      const halfHorizontal = Math.atan(Math.tan(fov * 0.5) * (canvas.clientWidth / Math.max(canvas.clientHeight, 1)));
+      if (Math.abs(delta) > halfHorizontal * 1.08) return null;
+
+      const x = 0.5 + delta / (halfHorizontal * 2);
+      const y = 0.56 - (verticalOffset - pitch) / fov;
+      if (y < 0.14 || y > 0.86) return null;
+      return { x: x * window.innerWidth, y: y * window.innerHeight };
+    }
+
+    function updateWaypoints() {
+      const forwardIndex = getForwardIndex();
+      const backIndex = getBackIndex();
+      const forwardPoint = forwardIndex >= 0 ? projectBearing(0, -0.1) : null;
+      const backPoint = backIndex >= 0 ? projectBearing(Math.PI, -0.1) : null;
+
+      if (forwardPoint) {
+        forwardWaypoint.hidden = false;
+        forwardWaypoint.style.left = `${forwardPoint.x}px`;
+        forwardWaypoint.style.top = `${forwardPoint.y}px`;
+      } else {
+        forwardWaypoint.hidden = true;
+      }
+
+      if (backPoint) {
+        backWaypoint.hidden = false;
+        backWaypoint.style.left = `${backPoint.x}px`;
+        backWaypoint.style.top = `${backPoint.y}px`;
+      } else {
+        backWaypoint.hidden = true;
+      }
+    }
+
+    function draw() {
+      resize();
+      gl.clearColor(0.06, 0.04, 0.025, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      if (texture) {
+        gl.useProgram(program);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform2f(program.uniforms.resolution, canvas.width, canvas.height);
+        gl.uniform1f(program.uniforms.yaw, yaw);
+        gl.uniform1f(program.uniforms.pitch, pitch);
+        gl.uniform1f(program.uniforms.fov, fov);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      updateWaypoints();
+      animationFrame = requestAnimationFrame(draw);
+    }
+
+    function pointerPosition(event) {
+      if (event.touches?.length) {
+        return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+      }
+      return { x: event.clientX, y: event.clientY };
+    }
+
+    function startDrag(event) {
+      const point = pointerPosition(event);
+      isDragging = true;
+      lastX = point.x;
+      lastY = point.y;
+      canvas.classList.add("dragging");
+      event.preventDefault();
+    }
+
+    function moveDrag(event) {
+      if (!isDragging) return;
+      const point = pointerPosition(event);
+      const dx = point.x - lastX;
+      const dy = point.y - lastY;
+      lastX = point.x;
+      lastY = point.y;
+
+      yaw = normalizeAngle(yaw + dx * 0.0046);
+      pitch = clamp(pitch + dy * 0.0046, -1.25, 1.25);
+      event.preventDefault();
+    }
+
+    function endDrag() {
+      isDragging = false;
+      canvas.classList.remove("dragging");
+    }
+
+    function changeZoom(delta) {
+      fov = clamp(fov + delta, Math.PI / 5.2, Math.PI / 1.7);
+      updateUi();
+    }
+
+    function resetCamera() {
+      yaw = 0;
+      pitch = 0;
+      fov = Math.PI / 2.35;
+      updateUi();
+    }
+
+    canvas.addEventListener("mousedown", startDrag);
+    window.addEventListener("mousemove", moveDrag);
+    window.addEventListener("mouseup", endDrag);
+    canvas.addEventListener("touchstart", startDrag, { passive: false });
+    window.addEventListener("touchmove", moveDrag, { passive: false });
+    window.addEventListener("touchend", endDrag);
+    canvas.addEventListener("wheel", event => {
+      changeZoom(event.deltaY > 0 ? 0.08 : -0.08);
+      event.preventDefault();
+    }, { passive: false });
+
+    prevButton.addEventListener("click", () => goToNode(getBackIndex()));
+    nextButton.addEventListener("click", () => goToNode(getForwardIndex()));
+    backWaypoint.addEventListener("click", () => goToNode(getBackIndex()));
+    forwardWaypoint.addEventListener("click", () => goToNode(getForwardIndex()));
+    zoomOut.addEventListener("click", () => changeZoom(0.12));
+    zoomIn.addEventListener("click", () => changeZoom(-0.12));
+    resetView.addEventListener("click", resetCamera);
+
+    window.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft") yaw = normalizeAngle(yaw + 0.18);
+      if (event.key === "ArrowRight") yaw = normalizeAngle(yaw - 0.18);
+      if (event.key === "ArrowUp") pitch = clamp(pitch + 0.16, -1.25, 1.25);
+      if (event.key === "ArrowDown") pitch = clamp(pitch - 0.16, -1.25, 1.25);
+      if (event.key === "PageUp") goToNode(getForwardIndex());
+      if (event.key === "PageDown") goToNode(getBackIndex());
+      if (event.key === "+" || event.key === "=") changeZoom(-0.12);
+      if (event.key === "-" || event.key === "_") changeZoom(0.12);
+    });
+
+    try {
+      setupRenderer();
+      updateUi();
+      goToNode(0);
+      animationFrame = requestAnimationFrame(draw);
+    } catch (error) {
+      showError(error.message || "The 360 renderer failed to initialize.");
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+    }
+  </script>
+</body>
+</html>
