@@ -191,6 +191,7 @@ For reproducible API regeneration, `scripts/generate_images.mjs` is included. It
 OPENAI_API_KEY=... node scripts/generate_images.mjs
 ```
 
+
 ## HTML VIEWER
 
 The complete single-file viewer is:
