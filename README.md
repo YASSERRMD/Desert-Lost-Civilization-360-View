@@ -4,6 +4,7 @@ Minimal street-view style 360 view experience for a continuous ancient desert ci
 
 This is an experiment with GPT-5.5, GPT-Image-2, and Codex as an end-to-end immersive world-building workflow: generate connected 2:1 panoramic scenes, save them as local assets, then build a browser-based 360 walkthrough around them.
 
+
 Inspired by Peter Gostev's GPT image 360 Babylon walkthrough:
 
 - https://github.com/petergpt/gpt-image-360-babylon-walkthrough
